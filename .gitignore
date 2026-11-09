@@ -4,3 +4,7 @@ __pycache__/
 .DS_Store
 dbt/target/
 dbt/dbt_packages/
+dbt/logs/
+.venv/
+.pytest_cache/
+dbt/.user.yml

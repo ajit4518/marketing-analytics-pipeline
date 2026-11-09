@@ -1,50 +1,40 @@
 """
-Facebook / Meta Ads Marketing API connector.
+Meta (Facebook) Marketing API connector.
 
-Pulls campaign, ad set, and ad-level performance metrics using the
-facebook-business SDK. Handles pagination and rate limiting.
+Pulls daily campaign-level Insights with the facebook-business SDK and
+returns a DataFrame in the shared raw schema (see connectors/transforms.py).
+Conversions and conversion value come from the `actions` and
+`action_values` lists, using the purchase action types.
+
+Iterating the SDK cursor follows Meta's paging links, so every page is read.
 
 Required env vars:
   META_APP_ID
   META_APP_SECRET
-  META_ACCESS_TOKEN   (long-lived system user token)
-  META_AD_ACCOUNT_ID  (act_XXXXXXXXXXXXXXXX)
+  META_ACCESS_TOKEN    (long-lived system user token)
+  META_AD_ACCOUNT_ID   (act_XXXXXXXXXXXXXXXX)
 """
 from __future__ import annotations
+
 import os
 from datetime import date
-from typing import List
+
 import pandas as pd
-from facebook_business.api import FacebookAdsApi
 from facebook_business.adobjects.adaccount import AdAccount
 from facebook_business.adobjects.adsinsights import AdsInsights
+from facebook_business.api import FacebookAdsApi
 
+from connectors.transforms import RAW_COLUMNS, meta_campaign_record
 
 CAMPAIGN_FIELDS = [
+    AdsInsights.Field.date_start,
     AdsInsights.Field.campaign_id,
     AdsInsights.Field.campaign_name,
-    AdsInsights.Field.date_start,
     AdsInsights.Field.impressions,
     AdsInsights.Field.clicks,
     AdsInsights.Field.spend,
-    AdsInsights.Field.reach,
-    AdsInsights.Field.frequency,
-    AdsInsights.Field.cpm,
-    AdsInsights.Field.cpc,
-    AdsInsights.Field.ctr,
-    AdsInsights.Field.conversions,
-    AdsInsights.Field.purchase_roas,
-]
-
-ADSET_FIELDS = [
-    AdsInsights.Field.adset_id,
-    AdsInsights.Field.adset_name,
-    AdsInsights.Field.campaign_name,
-    AdsInsights.Field.date_start,
-    AdsInsights.Field.impressions,
-    AdsInsights.Field.clicks,
-    AdsInsights.Field.spend,
-    AdsInsights.Field.conversions,
+    AdsInsights.Field.actions,
+    AdsInsights.Field.action_values,
 ]
 
 
@@ -57,28 +47,13 @@ class FacebookAdsConnector:
         )
         self._account = AdAccount(os.environ["META_AD_ACCOUNT_ID"])
 
-    def _fetch_insights(self, fields: List[str], start: date, end: date, level: str) -> pd.DataFrame:
+    def get_campaign_performance(self, start: date, end: date) -> pd.DataFrame:
         params = {
-            "level": level,
+            "level": "campaign",
             "time_range": {"since": start.isoformat(), "until": end.isoformat()},
             "time_increment": 1,
             "limit": 500,
         }
-        cursor = self._account.get_insights(fields=fields, params=params)
-        records = []
-        for row in cursor:
-            records.append(dict(row))
-        return pd.DataFrame(records)
-
-    def get_campaign_performance(self, start: date, end: date) -> pd.DataFrame:
-        df = self._fetch_insights(CAMPAIGN_FIELDS, start, end, level="campaign")
-        df["spend"] = pd.to_numeric(df.get("spend", 0), errors="coerce")
-        df["impressions"] = pd.to_numeric(df.get("impressions", 0), errors="coerce")
-        df["clicks"] = pd.to_numeric(df.get("clicks", 0), errors="coerce")
-        df["roas"] = df.get("purchase_roas", pd.Series(dtype=float)).apply(
-            lambda x: float(x[0]["value"]) if isinstance(x, list) and x else None
-        )
-        return df.rename(columns={"date_start": "date", "spend": "cost_usd"})
-
-    def get_adset_performance(self, start: date, end: date) -> pd.DataFrame:
-        return self._fetch_insights(ADSET_FIELDS, start, end, level="adset")
+        cursor = self._account.get_insights(fields=CAMPAIGN_FIELDS, params=params)
+        records = [meta_campaign_record(dict(row)) for row in cursor]
+        return pd.DataFrame.from_records(records, columns=RAW_COLUMNS)

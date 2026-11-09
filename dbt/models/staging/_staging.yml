@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: stg_google_ads
+    description: Google Ads daily campaign performance in the shared channel schema.
+    columns: &staging_columns
+      - name: date
+        data_tests: [not_null]
+      - name: campaign_id
+        data_tests: [not_null]
+      - name: impressions
+        data_tests: [not_null]
+      - name: spend_usd
+        data_tests: [not_null]
+
+  - name: stg_facebook_ads
+    description: Meta daily campaign performance in the shared channel schema.
+    columns: *staging_columns

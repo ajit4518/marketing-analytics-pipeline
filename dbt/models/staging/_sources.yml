@@ -1,0 +1,14 @@
+version: 2
+
+sources:
+  - name: marketing_raw
+    schema: marketing_raw
+    loaded_at_field: _loaded_at
+    freshness:
+      warn_after: {count: 30, period: hour}
+      error_after: {count: 54, period: hour}
+    tables:
+      - name: google_ads_campaigns
+        description: One row per Google Ads campaign per day, loaded by loaders/bigquery.py.
+      - name: facebook_ads_campaigns
+        description: One row per Meta campaign per day, loaded by loaders/bigquery.py.
