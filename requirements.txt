@@ -1,0 +1,12 @@
+# Airflow is pinned to 2.x: the DAG uses airflow.operators.* import paths.
+apache-airflow>=2.7,<3
+apache-airflow-providers-google>=10.0
+google-ads>=25.0
+facebook-business>=21.0
+google-cloud-bigquery>=3.20
+pandas>=2.0
+pyarrow>=14.0
+dbt-bigquery>=1.10,<2
+
+# dev
+pytest>=8.0
